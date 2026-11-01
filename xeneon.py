@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """OpenLinkHub Xeneon — a small GTK window for the Xeneon kiosk."""
+
 import argparse
 import hashlib
 import json
@@ -14,10 +15,22 @@ import urllib.parse
 import urllib.request
 
 DEFAULT_URL = 'http://127.0.0.1:27003/xeneon'
-CONFIG = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'openlinkhub-xeneon'
-DATA = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share')) / 'openlinkhub-xeneon/browser'
-CACHE = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'openlinkhub-xeneon'
-AUTOSTART = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'autostart/openlinkhub-xeneon.desktop'
+CONFIG = (
+    Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+    / 'openlinkhub-xeneon'
+)
+DATA = (
+    Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local/share'))
+    / 'openlinkhub-xeneon/browser'
+)
+CACHE = (
+    Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache'))
+    / 'openlinkhub-xeneon'
+)
+AUTOSTART = (
+    Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+    / 'autostart/openlinkhub-xeneon.desktop'
+)
 
 
 def validate_url(value):
@@ -27,7 +40,13 @@ def validate_url(value):
         port = url.port
     except ValueError as error:
         raise ValueError('Enter a valid HTTP or HTTPS URL.') from error
-    if url.scheme not in ('http', 'https') or not url.hostname or url.username or url.password or any(c.isspace() for c in value):
+    if (
+        url.scheme not in ('http', 'https')
+        or not url.hostname
+        or url.username
+        or url.password
+        or any(c.isspace() for c in value)
+    ):
         raise ValueError('Enter an HTTP or HTTPS URL without embedded credentials.')
     if port is not None and not 1 <= port <= 65535:
         raise ValueError('Invalid port.')
@@ -40,11 +59,23 @@ def origin(value):
 
 
 def read_config():
-    defaults = dict(url=DEFAULT_URL, width=1280, height=400, x=None, y=None, fullscreen=False, monitor=-1)
+    defaults = {
+        'url': DEFAULT_URL,
+        'width': 1280,
+        'height': 400,
+        'x': None,
+        'y': None,
+        'fullscreen': False,
+        'monitor': -1,
+    }
     try:
         value = json.loads((CONFIG / 'settings.json').read_text())
         defaults['url'] = validate_url(value.get('url', DEFAULT_URL))
-        for key, low, high in [('width', 320, 16384), ('height', 200, 16384), ('monitor', -1, 64)]:
+        for key, low, high in [
+            ('width', 320, 16384),
+            ('height', 200, 16384),
+            ('monitor', -1, 64),
+        ]:
             number = value.get(key)
             if type(number) is int and low <= number <= high:
                 defaults[key] = number
@@ -67,10 +98,19 @@ def save_config(settings):
 
 def desktop_entry(script):
     # Desktop Entry Exec escaping differs from shell escaping.
-    path = str(Path(script).resolve()).replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$').replace('%', '%%')
-    return ('[Desktop Entry]\nType=Application\nName=OpenLinkHub Xeneon\n'
-            'Comment=Xeneon kiosk window\nExec=/usr/bin/python3 "' + path + '"\n'
-            'Icon=video-display\nTerminal=false\nCategories=Utility;\nStartupNotify=true\n')
+    path = (
+        str(Path(script).resolve())
+        .replace('\\', '\\\\')
+        .replace('"', '\\"')
+        .replace('`', '\\`')
+        .replace('$', '\\$')
+        .replace('%', '%%')
+    )
+    return (
+        '[Desktop Entry]\nType=Application\nName=OpenLinkHub Xeneon\n'
+        'Comment=Xeneon kiosk window\nExec=/usr/bin/python3 "' + path + '"\n'
+        'Icon=video-display\nTerminal=false\nCategories=Utility;\nStartupNotify=true\n'
+    )
 
 
 def set_autostart(enabled):
@@ -97,23 +137,35 @@ def reachable(url):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--url', type=validate_url, help='Kiosk URL (saved after launch)')
+    parser.add_argument(
+        '--url', type=validate_url, help='Kiosk URL (saved after launch)'
+    )
     parser.add_argument('--fullscreen', action='store_true', help='Start fullscreen')
     parser.add_argument('--windowed', action='store_true', help='Start windowed')
-    parser.add_argument('--monitor', type=int, help='Zero-based monitor index; see Settings')
+    parser.add_argument(
+        '--monitor', type=int, help='Zero-based monitor index; see Settings'
+    )
     args = parser.parse_args()
     try:
         import gi
+
         gi.require_version('Gtk', '3.0')
         gi.require_version('WebKit2', '4.1')
         from gi.repository import Gtk, Gdk, Gio, GLib, WebKit2
     except (ImportError, ValueError) as error:
-        print('GTK3 / WebKitGTK 4.1 Python bindings are required. See README.md.\n' + str(error), file=sys.stderr)
+        print(
+            'GTK3 / WebKitGTK 4.1 Python bindings are required. See README.md.\n'
+            + str(error),
+            file=sys.stderr,
+        )
         return 1
 
     class Xeneon(Gtk.Application):
         def __init__(self):
-            super().__init__(application_id='io.github.openlinkhub.Xeneon', flags=Gio.ApplicationFlags.NON_UNIQUE)
+            super().__init__(
+                application_id='io.github.openlinkhub.Xeneon',
+                flags=Gio.ApplicationFlags.NON_UNIQUE,
+            )
             self.settings = read_config()
             if args.url:
                 self.settings['url'] = args.url
@@ -129,19 +181,38 @@ def main():
             self.generation = 0
 
         def do_activate(self):
-            self.window = Gtk.ApplicationWindow(application=self, title='OpenLinkHub Xeneon')
-            self.window.set_default_size(self.settings['width'], self.settings['height'])
+            self.window = Gtk.ApplicationWindow(
+                application=self, title='OpenLinkHub Xeneon'
+            )
+            self.window.set_default_size(
+                self.settings['width'], self.settings['height']
+            )
             self.window.set_icon_name('video-display')
-            self.header = Gtk.HeaderBar(title='OpenLinkHub Xeneon', show_close_button=True)
+            self.header = Gtk.HeaderBar(
+                title='OpenLinkHub Xeneon', show_close_button=True
+            )
             self.window.set_titlebar(self.header)
-            for icon, tooltip, callback in [('view-refresh-symbolic', 'Reload (Ctrl+R)', self.reload), ('view-fullscreen-symbolic', 'Fullscreen (F11; Escape to leave)', self.toggle_fullscreen), ('emblem-system-symbolic', 'Settings (Ctrl+,)', self.configure)]:
+            for icon, tooltip, callback in [
+                ('view-refresh-symbolic', 'Reload (Ctrl+R)', self.reload),
+                (
+                    'view-fullscreen-symbolic',
+                    'Fullscreen (F11; Escape to leave)',
+                    self.toggle_fullscreen,
+                ),
+                ('emblem-system-symbolic', 'Settings (Ctrl+,)', self.configure),
+            ]:
                 button = Gtk.Button.new_from_icon_name(icon, Gtk.IconSize.BUTTON)
                 button.set_tooltip_text(tooltip)
                 button.connect('clicked', callback)
                 self.header.pack_end(button)
             self.stack = Gtk.Stack()
             self.window.add(self.stack)
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16, halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
+            box = Gtk.Box(
+                orientation=Gtk.Orientation.VERTICAL,
+                spacing=16,
+                halign=Gtk.Align.CENTER,
+                valign=Gtk.Align.CENTER,
+            )
             self.message = Gtk.Label(label='Waiting for OpenLinkHub…')
             box.pack_start(self.message, False, False, 0)
             self.address = Gtk.Label(label=self.settings['url'])
@@ -155,11 +226,17 @@ def main():
             self.stack.add_named(box, 'waiting')
             for path in (DATA, CACHE):
                 path.mkdir(parents=True, exist_ok=True, mode=0o700)
-            manager = WebKit2.WebsiteDataManager(base_data_directory=str(DATA), base_cache_directory=str(CACHE))
+            manager = WebKit2.WebsiteDataManager(
+                base_data_directory=str(DATA), base_cache_directory=str(CACHE)
+            )
             self.context = WebKit2.WebContext.new_with_website_data_manager(manager)
-            self.context.get_cookie_manager().set_persistent_storage(str(DATA / 'cookies.sqlite'), WebKit2.CookiePersistentStorage.SQLITE)
+            self.context.get_cookie_manager().set_persistent_storage(
+                str(DATA / 'cookies.sqlite'), WebKit2.CookiePersistentStorage.SQLITE
+            )
             self.web = WebKit2.WebView.new_with_context(self.context)
-            self.web.get_settings().set_hardware_acceleration_policy(WebKit2.HardwareAccelerationPolicy.NEVER)
+            self.web.get_settings().set_hardware_acceleration_policy(
+                WebKit2.HardwareAccelerationPolicy.NEVER
+            )
             self.web.get_settings().set_enable_developer_extras(False)
             self.web.connect('load-changed', self.load_changed)
             self.web.connect('load-failed', self.load_failed)
@@ -193,10 +270,14 @@ def main():
                 rect = display.get_monitor(monitor).get_geometry()
                 self.window.move(rect.x, rect.y)
             elif self.settings['x'] is not None and 'X11' in type(display).__name__:
-                x, y = self.settings['x'], self.settings['y'] or 0
+                x = self.settings['x']
+                y = self.settings['y'] or 0
                 for index in range(display.get_n_monitors()):
                     rect = display.get_monitor(index).get_geometry()
-                    if rect.x <= x < rect.x + rect.width and rect.y <= y < rect.y + rect.height:
+                    if (
+                        rect.x <= x < rect.x + rect.width
+                        and rect.y <= y < rect.y + rect.height
+                    ):
                         self.window.move(x, y)
                         break
 
@@ -214,17 +295,25 @@ def main():
                 self.enter_fullscreen()
 
         def window_state(self, _, event):
-            self.settings['fullscreen'] = bool(event.new_window_state & Gdk.WindowState.FULLSCREEN)
+            self.settings['fullscreen'] = bool(
+                event.new_window_state & Gdk.WindowState.FULLSCREEN
+            )
             self.header.set_visible(not self.settings['fullscreen'])
             self.persist()
             return False
 
         def geometry(self, *_):
             native = self.window.get_window()
-            if native and not native.get_state() & (Gdk.WindowState.FULLSCREEN | Gdk.WindowState.MAXIMIZED):
-                self.settings['width'], self.settings['height'] = self.window.get_size()
+            if native and not native.get_state() & (
+                Gdk.WindowState.FULLSCREEN | Gdk.WindowState.MAXIMIZED
+            ):
+                size = self.window.get_size()
+                self.settings['width'] = size[0]
+                self.settings['height'] = size[1]
                 if 'X11' in type(self.window.get_display()).__name__:
-                    self.settings['x'], self.settings['y'] = self.window.get_position()
+                    position = self.window.get_position()
+                    self.settings['x'] = position[0]
+                    self.settings['y'] = position[1]
             return False
 
         def key_pressed(self, _, event):
@@ -261,12 +350,17 @@ def main():
                 self.loading = False
 
         def load_failed(self, _, event, uri, error):
-            if error.matches(WebKit2.network_error_quark(), WebKit2.NetworkError.CANCELLED):
+            if error.matches(
+                WebKit2.network_error_quark(), WebKit2.NetworkError.CANCELLED
+            ):
                 return True
             self.loading = False
             self.waiting = True
             self.stack.set_visible_child_name('waiting')
-            self.message.set_text('Certificate not trusted. Press Retry to review.' if self.tls_blocked else 'Waiting for OpenLinkHub…')
+            if self.tls_blocked:
+                self.message.set_text('Certificate not trusted. Press Retry to review.')
+            else:
+                self.message.set_text('Waiting for OpenLinkHub…')
             return True
 
         def process_terminated(self, *_):
@@ -289,15 +383,22 @@ def main():
             self.probing = True
             generation = self.generation
             url = self.settings['url']
+
             def worker():
                 online = reachable(url)
                 GLib.idle_add(self.probed, online, generation)
+
             threading.Thread(target=worker, daemon=True).start()
             return True
 
         def probed(self, online, generation):
             self.probing = False
-            if self.closed or generation != self.generation or self.tls_blocked or self.loading:
+            if (
+                self.closed
+                or generation != self.generation
+                or self.tls_blocked
+                or self.loading
+            ):
                 return False
             if online and self.waiting:
                 self.reload()
@@ -314,13 +415,30 @@ def main():
                 return False
             pem = certificate.props.certificate_pem
             fingerprint = hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()
-            dialog = Gtk.MessageDialog(transient_for=self.window, modal=True, message_type=Gtk.MessageType.WARNING, text='Trust this OpenLinkHub certificate for this session?')
-            dialog.format_secondary_text(uri + '\n\nSHA-256:\n' + fingerprint + '\n\nOnly accept a certificate from your OpenLinkHub installation.')
-            dialog.add_buttons('Cancel', Gtk.ResponseType.CANCEL, 'Trust for this session', Gtk.ResponseType.ACCEPT)
+            dialog = Gtk.MessageDialog(
+                transient_for=self.window,
+                modal=True,
+                message_type=Gtk.MessageType.WARNING,
+                text='Trust this OpenLinkHub certificate for this session?',
+            )
+            dialog.format_secondary_text(
+                uri
+                + '\n\nSHA-256:\n'
+                + fingerprint
+                + '\n\nOnly accept a certificate from your OpenLinkHub installation.'
+            )
+            dialog.add_buttons(
+                'Cancel',
+                Gtk.ResponseType.CANCEL,
+                'Trust for this session',
+                Gtk.ResponseType.ACCEPT,
+            )
             answer = dialog.run()
             dialog.destroy()
             if answer == Gtk.ResponseType.ACCEPT:
-                self.context.allow_tls_certificate_for_host(certificate, urllib.parse.urlsplit(uri).hostname)
+                self.context.allow_tls_certificate_for_host(
+                    certificate, urllib.parse.urlsplit(uri).hostname
+                )
                 GLib.idle_add(self.reload)
             else:
                 self.waiting = True
@@ -329,7 +447,10 @@ def main():
             return True
 
         def navigation(self, _, decision, kind):
-            if kind not in (WebKit2.PolicyDecisionType.NAVIGATION_ACTION, WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION):
+            if kind not in (
+                WebKit2.PolicyDecisionType.NAVIGATION_ACTION,
+                WebKit2.PolicyDecisionType.NEW_WINDOW_ACTION,
+            ):
                 return False
             action = decision.get_navigation_action()
             uri = action.get_request().get_uri()
@@ -340,23 +461,39 @@ def main():
                     return True
                 return False
             decision.ignore()
-            if action.is_user_gesture() and urllib.parse.urlsplit(uri).scheme in ('http', 'https'):
+            if action.is_user_gesture() and urllib.parse.urlsplit(uri).scheme in (
+                'http',
+                'https',
+            ):
                 Gio.AppInfo.launch_default_for_uri(uri, None)
             return True
 
         def permission(self, _, request):
             if isinstance(request, WebKit2.GeolocationPermissionRequest):
-                dialog = Gtk.MessageDialog(transient_for=self.window, modal=True, message_type=Gtk.MessageType.QUESTION, buttons=Gtk.ButtonsType.YES_NO, text='Allow location access for the weather widget?')
+                dialog = Gtk.MessageDialog(
+                    transient_for=self.window,
+                    modal=True,
+                    message_type=Gtk.MessageType.QUESTION,
+                    buttons=Gtk.ButtonsType.YES_NO,
+                    text='Allow location access for the weather widget?',
+                )
                 allow = dialog.run() == Gtk.ResponseType.YES
                 dialog.destroy()
-                request.allow() if allow else request.deny()
+                if allow:
+                    request.allow()
+                else:
+                    request.deny()
             else:
                 request.deny()
             return True
 
         def configure(self, *_):
-            dialog = Gtk.Dialog(title='Display settings', transient_for=self.window, modal=True)
-            dialog.add_buttons('Cancel', Gtk.ResponseType.CANCEL, 'Save', Gtk.ResponseType.OK)
+            dialog = Gtk.Dialog(
+                title='Display settings', transient_for=self.window, modal=True
+            )
+            dialog.add_buttons(
+                'Cancel', Gtk.ResponseType.CANCEL, 'Save', Gtk.ResponseType.OK
+            )
             grid = Gtk.Grid(column_spacing=12, row_spacing=12, margin=18)
             dialog.get_content_area().add(grid)
             entry = Gtk.Entry(text=self.settings['url'], width_chars=48)
@@ -368,14 +505,21 @@ def main():
             for index in range(display.get_n_monitors()):
                 monitor = display.get_monitor(index)
                 rect = monitor.get_geometry()
-                monitors.append(str(index), f'{index}: {monitor.get_model() or "Monitor"} ({rect.width} × {rect.height})')
+                monitors.append(
+                    str(index),
+                    f'{index}: {monitor.get_model() or "Monitor"} ({rect.width} × {rect.height})',
+                )
             monitors.set_active_id(str(self.settings['monitor']))
             if monitors.get_active_id() is None:
                 monitors.set_active_id('-1')
             grid.attach(Gtk.Label(label='Monitor', xalign=0), 0, 1, 1, 1)
             grid.attach(monitors, 1, 1, 1, 1)
-            fullscreen = Gtk.CheckButton(label='Fullscreen', active=self.settings['fullscreen'])
-            autostart = Gtk.CheckButton(label='Start when I log in', active=AUTOSTART.exists())
+            fullscreen = Gtk.CheckButton(
+                label='Fullscreen', active=self.settings['fullscreen']
+            )
+            autostart = Gtk.CheckButton(
+                label='Start when I log in', active=AUTOSTART.exists()
+            )
             grid.attach(fullscreen, 1, 2, 1, 1)
             grid.attach(autostart, 1, 3, 1, 1)
             error = Gtk.Label(xalign=0, wrap=True)
@@ -395,7 +539,10 @@ def main():
                 self.generation += 1
                 self.persist()
                 self.place_window()
-                self.enter_fullscreen() if fullscreen.get_active() else self.window.unfullscreen()
+                if fullscreen.get_active():
+                    self.enter_fullscreen()
+                else:
+                    self.window.unfullscreen()
                 self.reload()
                 break
             dialog.destroy()
